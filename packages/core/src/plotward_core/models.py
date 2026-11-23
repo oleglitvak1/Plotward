@@ -74,6 +74,12 @@ class Plant(GardenScoped, Base):
     __tablename__ = "plant"
     __table_args__ = (
         CheckConstraint("status in ('draft', 'active', 'removed')", name="plant_status_valid"),
+        CheckConstraint("kind is null or kind in ('perennial', 'annual')", name="plant_kind_valid"),
+        # A plant is removed exactly when it has an end date. Only living plants are match
+        # candidates, so next season's planting in the same spot is a new plant.
+        CheckConstraint(
+            "(status = 'removed') = (ended_on is not null)", name="plant_end_matches_status"
+        ),
     )
 
     id: Mapped[uuid.UUID] = _pk()
@@ -82,7 +88,10 @@ class Plant(GardenScoped, Base):
     )
     species: Mapped[str | None] = mapped_column(String(200))
     cultivar: Mapped[str | None] = mapped_column(String(200))
+    # perennial (trees, shrubs) or annual (tomatoes); null until known, e.g. a draft plant.
+    kind: Mapped[str | None] = mapped_column(String(16))
     planted_date: Mapped[date | None] = mapped_column(Date)
+    ended_on: Mapped[date | None] = mapped_column(Date)
     location: Mapped[Any | None] = mapped_column(Geography("POINT", srid=4326))
     status: Mapped[str] = mapped_column(String(16), default="draft", server_default="draft")
     created_at: Mapped[datetime] = _created()

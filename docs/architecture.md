@@ -27,12 +27,14 @@ The PoC proves one loop end to end: a photo comes in, the system recognizes or c
 - A frost alert from the National Weather Service API as the first proactive feature.
 - A `model_call` log with cost per call, a monthly budget cap, and a small eval set built from your verdicts.
 - Care logging through the chat (a `log_care` tool), so "when did I last prune X?" has data to answer from.
+- Plant lifespans: tell the chat "I pulled the tomatoes" and the plant ends, so a seasonal crop never absorbs next year's photos.
 
 **Deferred**
 
 - Overhead map and zone polygons, fixed cameras, storage retention tiers.
 - Local vision-language models, a learned router, small trained classifiers.
 - A native app, multi-user features, Kubernetes.
+- Plantings: tracking a row or bed of annuals as one unit instead of individual plants.
 
 ## Architecture
 
@@ -56,7 +58,7 @@ Eight tables carry the PoC (the job queue and saved eval cases add two more), al
 | --- | --- | --- |
 | `garden` | Tenant boundary | id, name, timezone, home location |
 | `zone` | Optional named area (bed, orchard) | garden_id, name, polygon (PostGIS) |
-| `plant` | One physical plant | garden_id, zone_id, species, cultivar, planted_date, location (PostGIS point), status |
+| `plant` | One physical plant | garden_id, zone_id, species, cultivar, kind (perennial or annual), planted_date, ended_on, location (PostGIS point), status |
 | `photo` | One uploaded image | garden_id, plant_id (nullable), captured_at, received_at, raw EXIF, GPS point, file key, content hash, embedding (pgvector), embedding model and version, storage_tier |
 | `label` | Verified fact about a plant or photo | target, field, value, source (user or model), confirmed_at |
 | `care_event` | Something you did | plant_id, type (water, prune, fertilize), date, note |
@@ -70,6 +72,7 @@ Rules that keep it multi-user ready and cheap to change:
 - Keep raw EXIF as JSON next to the parsed fields, so matching can be redone later.
 - Labels are append-only with a source, so a user-confirmed value always outranks a model guess. Current values come from a view that takes the latest user label, else the latest model label.
 - Eval cases are saved from your verdicts on answers: input references, expected answer, and a pass or fail result per run.
+- Plants have a lifespan. Perennials (trees, shrubs) live for years. Annuals (tomatoes) end when you pull them, which sets `ended_on` and marks the plant removed. Only living plants are match candidates, so next year's planting in the same spot is a new plant with its own history.
 
 ## Key flows
 
@@ -80,19 +83,19 @@ Four flows cover everything the PoC does. Only flows 2 and 3 spend model money.
 1. Syncthing delivers a new file from your Pixel to a watched folder; the worker picks it up.
 2. Parse EXIF (capture time, GPS, heading), hash the file, create a resized master and a thumbnail.
 3. Embed the image locally and store the vector.
-4. Search existing plants by GPS proximity first, then by embedding similarity.
+4. Search living plants by GPS proximity first, then by embedding similarity against each plant's most recent photos, so a growing plant is compared to how it looks now.
 5. Confident match: attach the photo to that plant. No match: create a draft plant and queue a question. Photos taken within a minute and a few meters of each other are grouped first, so one pass along a bed does not create many drafts.
 
 **2. Question loop**
 
-1. Pick the highest-value open question (new plant, uncertain species, unexplained change) within the daily cap.
+1. Pick the highest-value open question (new plant, uncertain species, unexplained change) within the daily cap. At the start of the growing season, include a prompt to confirm which annuals were replanted.
 2. Claude drafts a one-tap question with a suggested answer; a push notification (ntfy) delivers it.
 3. Your answer becomes a verified label. A skip is recorded and respected.
 
 **3. Ask the garden**
 
 1. You send a question, optionally with a photo.
-2. Claude calls tools: find plant, search similar photos, read care log, log care, get weather.
+2. Claude calls tools: find plant, search similar photos, read care log, log care, end plant, get weather.
 3. The answer cites the records it used, and the call is logged with tokens and cost.
 4. You mark the answer right or wrong, which saves it as an eval case.
 
@@ -165,7 +168,7 @@ Rules that keep a monorepo healthy:
 Six milestones, each a few evenings of work. Each one ends with something you can run.
 
 1. **Skeleton:** Docker Compose, Postgres with pgvector, the schema, and an upload and ingest endpoint that handles HEIC and JPEG and stores raw EXIF.
-2. **Embed and match:** local embeddings, similarity search, and the cold-start flow that creates a draft plant from an unmatched photo.
+2. **Embed and match:** local embeddings, similarity search, and the cold-start flow that creates a draft plant from an unmatched photo. Plants carry an end date, so only living plants are match candidates.
 3. **Capture path:** Syncthing from the Pixel's dedicated camera folder into the watched folder, so walking the yard feeds the system with no manual upload.
 4. **Ask the garden:** the chat endpoint with Claude tool calling, including care logging, plus the `llm.py` wrapper that logs every call.
 5. **Question loop:** daily-capped questions, ntfy delivery, and answers stored as verified labels.
@@ -187,3 +190,4 @@ Six milestones, each a few evenings of work. Each one ends with something you ca
 - Where the repo lives: built here and copied to the Mac, or written directly into a folder on the Mac.
 - Matching thresholds: what GPS radius and similarity score count as a confident match, to be tuned on your first hundred photos.
 - Where frost sensitivity comes from: a hand-kept species table, or a Claude lookup cached per species.
+- Annuals: whether the unit is an individual plant or a planting (a row or bed), and how matching copes with a plant that changes shape from seedling to fruiting.
