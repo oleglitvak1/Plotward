@@ -32,7 +32,8 @@ services:
     ports:
       - "127.0.0.1:8000:8000"
     volumes:
-      - ../data:/data
+      # Photos live outside the repo by default. Set PLOTWARD_DATA_HOST_DIR in .env to change it.
+      - ${PLOTWARD_DATA_HOST_DIR:-${HOME}/plotward-data}:/data
 
 volumes:
   pgdata:

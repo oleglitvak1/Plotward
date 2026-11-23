@@ -24,6 +24,9 @@ curl -H "X-API-Key: $PLOTWARD_API_KEY" -F file=@IMG_0001.jpg http://127.0.0.1:80
 
 A first upload returns `201`; the same bytes again return `200` with `"duplicate": true`.
 
+Photos are stored in `~/plotward-data` by default, outside the repo (change it with
+`PLOTWARD_DATA_HOST_DIR` in `.env`). The database lives in the `pgdata` Docker volume. Back up both.
+
 ## Develop
 
 ```bash
