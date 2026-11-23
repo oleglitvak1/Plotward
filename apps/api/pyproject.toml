@@ -1,0 +1,21 @@
+[project]
+name = "plotward-api"
+version = "0.1.0"
+description = "Plotward HTTP API"
+requires-python = ">=3.12"
+dependencies = [
+    "plotward-core",
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "python-multipart>=0.0.9",
+]
+
+[tool.uv.sources]
+plotward-core = { workspace = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/plotward_api"]

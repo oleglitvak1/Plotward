@@ -1,0 +1,38 @@
+# Run from the repo root:  docker compose -f infra/docker-compose.yml --env-file .env up --build
+services:
+  db:
+    build: ./postgres
+    environment:
+      POSTGRES_USER: plotward
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-plotward}
+      POSTGRES_DB: plotward
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U plotward -d plotward"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build:
+      context: ..
+      dockerfile: infra/api.Dockerfile
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PLOTWARD_DATABASE_URL: postgresql+psycopg://plotward:${POSTGRES_PASSWORD:-plotward}@db:5432/plotward
+      PLOTWARD_DATA_DIR: /data
+      PLOTWARD_API_KEY: ${PLOTWARD_API_KEY:?set PLOTWARD_API_KEY in .env}
+      PLOTWARD_GARDEN_NAME: ${PLOTWARD_GARDEN_NAME:-My garden}
+      PLOTWARD_GARDEN_TIMEZONE: ${PLOTWARD_GARDEN_TIMEZONE:-America/Los_Angeles}
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - ../data:/data
+
+volumes:
+  pgdata:
