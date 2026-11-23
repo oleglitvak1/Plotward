@@ -12,8 +12,17 @@ SF_LAT = 37 + 46 / 60 + 29.7 / 3600
 SF_LON = -(122 + 25 / 60 + 9.8 / 3600)
 
 
+def _dms(value: float) -> tuple[float, float, float]:
+    value = abs(value)
+    d = int(value)
+    m = int((value - d) * 60)
+    return float(d), float(m), (value - d - m / 60) * 3600
+
+
 def make_exif(
     *,
+    lat: float | None = None,
+    lon: float | None = None,
     taken: str | None = "2026:11:21 15:30:00",
     offset: str | None = "-08:00",
     gps: tuple[tuple[float, float, float], str, tuple[float, float, float], str] | None = (
@@ -24,6 +33,8 @@ def make_exif(
     ),
     orientation: int | None = None,
 ) -> Image.Exif:
+    if lat is not None and lon is not None:
+        gps = (_dms(lat), "N" if lat >= 0 else "S", _dms(lon), "E" if lon >= 0 else "W")
     exif = Image.Exif()
     exif[0x010F] = "TestCam"  # Make
     if orientation is not None:

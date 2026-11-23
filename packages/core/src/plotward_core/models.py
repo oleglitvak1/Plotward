@@ -102,6 +102,11 @@ class Photo(GardenScoped, Base):
     __table_args__ = (
         UniqueConstraint("garden_id", "content_hash", name="photo_garden_content_hash_key"),
         CheckConstraint("storage_tier in ('hot', 'cold')", name="photo_storage_tier_valid"),
+        CheckConstraint(
+            "match_method is null or match_method in "
+            "('gps_embedding', 'gps_only', 'embedding', 'grouped', 'new_plant', 'user')",
+            name="photo_match_method_valid",
+        ),
     )
 
     id: Mapped[uuid.UUID] = _pk()
@@ -125,6 +130,9 @@ class Photo(GardenScoped, Base):
     embedding_model: Mapped[str | None] = mapped_column(String(100))
     embedding_version: Mapped[str | None] = mapped_column(String(50))
     storage_tier: Mapped[str] = mapped_column(String(8), default="hot", server_default="hot")
+    # How the photo got its plant, so match accuracy can be measured later.
+    match_method: Mapped[str | None] = mapped_column(String(24))
+    match_score: Mapped[float | None] = mapped_column(Float)
 
 
 class Label(GardenScoped, Base):

@@ -31,9 +31,33 @@ services:
       PLOTWARD_GARDEN_TIMEZONE: ${PLOTWARD_GARDEN_TIMEZONE:-America/Los_Angeles}
     ports:
       - "127.0.0.1:8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz')"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
     volumes:
       # Photos live outside the repo by default. Set PLOTWARD_DATA_HOST_DIR in .env to change it.
       - ${PLOTWARD_DATA_HOST_DIR:-${HOME}/plotward-data}:/data
 
+  worker:
+    build:
+      context: ..
+      dockerfile: infra/worker.Dockerfile
+    depends_on:
+      api:
+        condition: service_healthy  # the api container applies the migrations
+    restart: unless-stopped
+    environment:
+      PLOTWARD_DATABASE_URL: postgresql+psycopg://plotward:${POSTGRES_PASSWORD:-plotward}@db:5432/plotward
+      PLOTWARD_DATA_DIR: /data
+      PLOTWARD_EMBEDDER: ${PLOTWARD_EMBEDDER:-open_clip}
+      PLOTWARD_GARDEN_NAME: ${PLOTWARD_GARDEN_NAME:-My garden}
+      PLOTWARD_GARDEN_TIMEZONE: ${PLOTWARD_GARDEN_TIMEZONE:-America/Los_Angeles}
+    volumes:
+      - ${PLOTWARD_DATA_HOST_DIR:-${HOME}/plotward-data}:/data
+      - hfcache:/hf
+
 volumes:
   pgdata:
+  hfcache:

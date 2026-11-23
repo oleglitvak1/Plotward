@@ -1,0 +1,24 @@
+[project]
+name = "plotward-worker"
+version = "0.1.0"
+description = "Plotward background worker: embeds photos and matches them to plants"
+requires-python = ">=3.12"
+dependencies = ["plotward-core", "plotward-ml"]
+
+[project.optional-dependencies]
+# The real embedding model. Heavy, so the worker image installs it separately.
+clip = ["plotward-ml[clip]"]
+
+[project.scripts]
+plotward-worker = "plotward_worker.__main__:main"
+
+[tool.uv.sources]
+plotward-core = { workspace = true }
+plotward-ml = { workspace = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/plotward_worker"]
